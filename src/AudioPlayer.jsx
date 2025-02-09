@@ -20,12 +20,13 @@ const AudioPlayer = () => {
   const [showVolume, setShowVolume] = useState(false);
   const [previousVolume, setPreviousVolume] = useState(1);
 
-  // New state for handling files
+  // for handling files
   const [audioFiles, setAudioFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentBlobUrl, setCurrentBlobUrl] = useState(null);
 
-  // Fetch files from Supabase
+  // fetch files from Supabase
   useEffect(() => {
     async function fetchAudioFiles() {
       try {
@@ -39,18 +40,12 @@ const AudioPlayer = () => {
 
         console.log("Retrieved: {}", data);
 
-        // Filter for audio files if needed
         const audioFiles = data.filter((file) => file.name.endsWith(".mp3"));
-
         setAudioFiles(audioFiles);
 
-        // Initialize audio with first file if available
+        // load the first audio file
         if (audioFiles.length > 0) {
-          const { data: fileData } = await supabase.storage
-            .from("audio")
-            .download(`files/${audioFiles[0].name}`);
-
-          audioRef.current = new Audio(URL.createObjectURL(fileData));
+          await loadAudioFile(audioFiles[0]);
         }
 
         setIsLoading(false);
@@ -62,47 +57,61 @@ const AudioPlayer = () => {
 
     fetchAudioFiles();
 
-    // Cleanup function
+    // cleanup
     return () => {
-      if (audioRef.current) {
-        URL.revokeObjectURL(audioRef.current.src);
+      if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
       }
     };
   }, []);
 
-  useEffect(() => {
-    if (!audioRef.current) return;
-    const audio = audioRef.current;
+  const loadAudioFile = async (file) => {
+    try {
+      const { data: fileData } = await supabase.storage
+        .from("audio")
+        .download(`files/${file.name}`);
 
-    // set duration when metadata is loaded
-    const handleLoadedMetadata = () => {
+      // clean up previous blob URL
+      if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+      }
+
+      // create new blob URL
+      const blobUrl = URL.createObjectURL(fileData);
+      setCurrentBlobUrl(blobUrl);
+
+      // create new audio instance
+      const audio = new Audio(blobUrl);
+
+      // wait for metadata to load
+      await new Promise((resolve, reject) => {
+        audio.addEventListener("loadedmetadata", resolve);
+        audio.addEventListener("error", reject);
+      });
+
+      // set the audio reference
+      audioRef.current = audio;
       setDuration(audio.duration);
-    };
-    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
 
-    // update progress
-    const updateProgress = () => {
-      setProgress(audio.currentTime);
-    };
-    audio.addEventListener("timeupdate", updateProgress);
+      // reset player state
+      setProgress(0);
+      setIsPlaying(false);
 
-    // if audio already loaded, set duration
-    if (audio.readyState >= 2) {
-      setDuration(audio.duration);
+      // setup audio event listeners
+      setupAudioEventListeners(audio);
+    } catch (err) {
+      setError(`Error loading audio file: ${err.message}`);
     }
+  };
 
-    //cleanup - pause audio when component unmounts
-    return () => {
-      audio.pause();
-      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
-      audio.removeEventListener("timeupdate", updateProgress);
-    };
-  }, []);
+  const setupAudioEventListeners = (audio) => {
+    // update progress
+    audio.addEventListener("timeupdate", () => {
+      setProgress(audio.currentTime);
+    });
 
-  // when song ended, repeat song if repeat is enabled
-  useEffect(() => {
-    const audio = audioRef.current;
-    const handleAudioEnd = () => {
+    // handle end of audio
+    audio.addEventListener("ended", () => {
       if (isRepeat) {
         audio.currentTime = 0;
         audio.play();
@@ -110,20 +119,21 @@ const AudioPlayer = () => {
         setIsPlaying(false);
         audio.currentTime = 0;
       }
-    };
-    audio.addEventListener("ended", handleAudioEnd);
+    });
 
-    return () => {
-      audio.removeEventListener("ended", handleAudioEnd);
-    };
-  }, [isRepeat]);
+    // set initial volume
+    audio.volume = volume;
+  };
 
-  // volume change
   useEffect(() => {
-    audioRef.current.volume = volume;
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
   }, [volume]);
 
   const togglePlayPause = () => {
+    if (!audioRef.current) return;
+
     const audio = audioRef.current;
     if (isPlaying) {
       audio.pause();
@@ -134,6 +144,8 @@ const AudioPlayer = () => {
   };
 
   const stopAudio = () => {
+    if (!audioRef.current) return;
+
     const audio = audioRef.current;
     audio.pause();
     audio.currentTime = 0;
@@ -178,7 +190,7 @@ const AudioPlayer = () => {
     return <Volume2 />;
   };
 
-  // If still loading or there's an error, show appropriate message
+  // if still loading or there's an error, show appropriate message
   if (isLoading) {
     return <div>Loading audio files...</div>;
   }
