@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Pause, Square, Repeat } from "lucide-react";
+import {
+  Play,
+  Pause,
+  Square,
+  Volume2,
+  Volume1,
+  VolumeX,
+  Repeat,
+} from "lucide-react";
 
 const AudioPlayer = () => {
   // maintain audio instance across renders
@@ -8,6 +16,9 @@ const AudioPlayer = () => {
   const [isRepeat, setIsRepeat] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [showVolume, setShowVolume] = useState(false);
+  const [previousVolume, setPreviousVolume] = useState(1);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -49,6 +60,7 @@ const AudioPlayer = () => {
     };
   }, []);
 
+  // for repeat
   useEffect(() => {
     const audio = audioRef.current;
     const handleAudioEnd = () => {
@@ -66,6 +78,11 @@ const AudioPlayer = () => {
       audio.removeEventListener("ended", handleAudioEnd);
     };
   }, [isRepeat]);
+
+  // volume change
+  useEffect(() => {
+    audioRef.current.volume = volume;
+  }, [volume]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -89,6 +106,20 @@ const AudioPlayer = () => {
     setIsRepeat(!isRepeat);
   };
 
+  const toggleVolume = () => {
+    if (volume > 0) {
+      setPreviousVolume(volume);
+      setVolume(0);
+    } else {
+      setVolume(previousVolume);
+    }
+  };
+
+  const handleVolumeChange = (e) => {
+    const newVolume = parseFloat(e.target.value);
+    setVolume(newVolume);
+  };
+
   const onProgressChange = (e) => {
     const newTime = e.target.value;
     audioRef.current.currentTime = newTime;
@@ -102,6 +133,12 @@ const AudioPlayer = () => {
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
+  const getVolumeIcon = () => {
+    if (volume === 0) return <VolumeX />;
+    if (volume < 0.5) return <Volume1 />;
+    return <Volume2 />;
+  };
+
   return (
     <div>
       <div className="player-card">
@@ -111,6 +148,36 @@ const AudioPlayer = () => {
         <button onClick={stopAudio}>
           <Square />
         </button>
+
+        <div className="volume-controls">
+          <button
+            className="volume-button"
+            onClick={() => setShowVolume(!showVolume)}
+            onDoubleClick={toggleVolume}
+            title="Click to show volume slider, double-click to mute"
+          >
+            {getVolumeIcon()}
+          </button>
+          {showVolume && (
+            <div className="volume-slider-container">
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={volume}
+                onChange={handleVolumeChange}
+                style={{
+                  width: "100px",
+                  height: "100%",
+                  transform: "rotate(-90deg) translateX(-34px)",
+                  transformOrigin: "left",
+                }}
+              />
+            </div>
+          )}
+        </div>
+
         <button
           onClick={toggleRepeat}
           style={{

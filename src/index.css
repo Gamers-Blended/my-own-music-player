@@ -47,3 +47,26 @@ input[type="range"] {
   accent-color: #646cff;
   outline: none;
 }
+
+.volume-controls {
+  position: relative;
+}
+
+.volume-button {
+padding: 8px;
+border-radius: 50%;
+}
+
+.volume-slider-container {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 100px;
+  background: white;
+  padding: 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  margin-bottom: 8px;
+}
