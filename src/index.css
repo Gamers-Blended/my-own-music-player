@@ -34,6 +34,27 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
+.error-container {
+  margin-top: 1rem;
+}
+
+.error-message {
+  color: #EF4444;
+}
+
+.error-button {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem; 
+  padding-left: 1rem;
+  padding-right: 1rem; 
+  border-radius: 0.25rem; 
+  color: #ffffff; 
+  background-color: #3B82F6; 
+}
+.error-button:hover {
+  background-color: #2563EB;
+}
+
 .player-card {
   width: 20rem;
   background-color: #f1f4f9;
@@ -69,4 +90,37 @@ border-radius: 50%;
   border-radius: 4px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
   margin-bottom: 8px;
+}
+
+.tracklist-container {
+  overflow: hidden; 
+  border-radius: 0.375rem; 
+  border-width: 1px; 
+}
+
+.tracklist-table {
+  width: 100%; 
+  font-size: 0.875rem;
+  line-height: 1.25rem; 
+  background-color: #ffffff; 
+  border-collapse: collapse; 
+}
+
+.tracklist-table-header {
+  border-bottom-width: 1px; 
+}
+
+.tracklist-table-row {
+  padding-top: 1rem;
+  padding-bottom: 1rem; 
+  padding-left: 1.5rem;
+  padding-right: 1.5rem; 
+  text-align: left; 
+}
+
+.tracklist-table-row-data {
+  padding-top: 1rem;
+  padding-bottom: 1rem; 
+  padding-left: 1.5rem;
+  padding-right: 1.5rem; 
 }

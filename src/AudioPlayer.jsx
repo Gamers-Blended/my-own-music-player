@@ -7,11 +7,12 @@ import {
   Volume1,
   VolumeX,
   Repeat,
+  SkipForward,
 } from "lucide-react";
 import supabase from "./config/supabase";
 
 const AudioPlayer = () => {
-  const audioRef = useRef(new Audio("/a.mp3")); // maintain audio instance across renders
+  const audioRef = useRef(null); // maintain audio instance across renders
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -25,6 +26,32 @@ const AudioPlayer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [currentBlobUrl, setCurrentBlobUrl] = useState(null);
+  const [currentSongIndex, setCurrentSongIndex] = useState(0);
+
+  // define event handler functions before setupAudioEventListeners
+  const updateProgress = (audio) => {
+    setProgress(audio.currentTime);
+  };
+
+  const handleAudioEnd = (audio) => {
+    if (isRepeat) {
+      audio.currentTime = 0;
+      audio.play();
+    } else {
+      handleNext();
+    }
+  };
+
+  const setupAudioEventListeners = (audio) => {
+    audio.removeEventListener("timeupdate", () => updateProgress(audio));
+    audio.removeEventListener("ended", () => handleAudioEnd(audio));
+
+    audio.addEventListener("timeupdate", () => updateProgress(audio));
+    audio.addEventListener("ended", () => handleAudioEnd(audio));
+
+    // set initial volume
+    audio.volume = volume;
+  };
 
   // fetch files from Supabase
   useEffect(() => {
@@ -45,7 +72,7 @@ const AudioPlayer = () => {
 
         // load the first audio file
         if (audioFiles.length > 0) {
-          await loadAudioFile(audioFiles[0]);
+          await loadAudioFile(audioFiles[0], 0);
         }
 
         setIsLoading(false);
@@ -59,22 +86,37 @@ const AudioPlayer = () => {
 
     // cleanup
     return () => {
-      if (currentBlobUrl) {
-        URL.revokeObjectURL(currentBlobUrl);
-      }
+      cleanupAudio();
     };
   }, []);
 
-  const loadAudioFile = async (file) => {
+  const cleanupAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
+    if (currentBlobUrl) {
+      URL.revokeObjectURL(currentBlobUrl);
+      setCurrentBlobUrl(null);
+    }
+  };
+
+  const loadAudioFile = async (file, index) => {
+    if (!file) {
+      setError("Invalid audio file");
+      return;
+    }
+
     try {
-      const { data: fileData } = await supabase.storage
+      // clean up previous audio
+      cleanupAudio();
+
+      const { data: fileData, error: downloadError } = await supabase.storage
         .from("audio")
         .download(`files/${file.name}`);
 
-      // clean up previous blob URL
-      if (currentBlobUrl) {
-        URL.revokeObjectURL(currentBlobUrl);
-      }
+      if (downloadError) throw downloadError;
 
       // create new blob URL
       const blobUrl = URL.createObjectURL(fileData);
@@ -85,44 +127,44 @@ const AudioPlayer = () => {
 
       // wait for metadata to load
       await new Promise((resolve, reject) => {
-        audio.addEventListener("loadedmetadata", resolve);
-        audio.addEventListener("error", reject);
+        audio.addEventListener("loadedmetadata", resolve, { once: true });
+        audio.addEventListener("error", reject, { once: true });
       });
 
       // set the audio reference
       audioRef.current = audio;
       setDuration(audio.duration);
+      setCurrentSongIndex(index);
 
       // reset player state
       setProgress(0);
       setIsPlaying(false);
+      setError(null); // clear any previous errors
 
-      // setup audio event listeners
       setupAudioEventListeners(audio);
+
+      // auto-play the next song
+      audio.play();
+      setIsPlaying(true);
     } catch (err) {
       setError(`Error loading audio file: ${err.message}`);
+      console.error("Error loading audio:", err);
     }
   };
 
-  const setupAudioEventListeners = (audio) => {
-    // update progress
-    audio.addEventListener("timeupdate", () => {
-      setProgress(audio.currentTime);
-    });
+  const handleNext = () => {
+    if (audioFiles.length === 0) return;
 
-    // handle end of audio
-    audio.addEventListener("ended", () => {
-      if (isRepeat) {
-        audio.currentTime = 0;
-        audio.play();
-      } else {
-        setIsPlaying(false);
-        audio.currentTime = 0;
-      }
-    });
+    const nextIndex = (currentSongIndex + 1) % audioFiles.length;
+    const nextFile = audioFiles[nextIndex];
 
-    // set initial volume
-    audio.volume = volume;
+    if (nextFile) {
+      loadAudioFile(nextFile, nextIndex);
+    }
+  };
+
+  const handleSongSelect = (file, index) => {
+    loadAudioFile(file, index);
   };
 
   useEffect(() => {
@@ -135,6 +177,7 @@ const AudioPlayer = () => {
     if (!audioRef.current) return;
 
     const audio = audioRef.current;
+
     if (isPlaying) {
       audio.pause();
     } else {
@@ -172,7 +215,9 @@ const AudioPlayer = () => {
   };
 
   const onProgressChange = (e) => {
-    const newTime = e.target.value;
+    if (!audioRef.current) return;
+
+    const newTime = parseFloat(e.target.value);
     audioRef.current.currentTime = newTime;
     setProgress(newTime);
   };
@@ -196,7 +241,14 @@ const AudioPlayer = () => {
   }
 
   if (error) {
-    return <div>Error loading audio files: {error}</div>;
+    return (
+      <div className="error-container">
+        <div className="error-message">Error: {error}</div>
+        <button onClick={() => setError(null)} className="error-button">
+          Clear Error
+        </button>
+      </div>
+    );
   }
 
   if (audioFiles.length === 0) {
@@ -212,6 +264,10 @@ const AudioPlayer = () => {
 
         <button onClick={stopAudio}>
           <Square />
+        </button>
+
+        <button onClick={handleNext} title="Next song">
+          <SkipForward />
         </button>
 
         <div className="volume-controls">
@@ -269,6 +325,48 @@ const AudioPlayer = () => {
           <span>{formatTime(duration)}</span>
         </div>
       </div>
+
+      <div className="tracklist-container">
+        <table className="tracklist-table">
+          <thead>
+            <tr className="tracklist-table-header">
+              <th className="tracklist-table-row">#</th>
+              <th className="tracklist-table-row">File Name</th>
+              <th className="tracklist-table-row">Size</th>
+            </tr>
+          </thead>
+          <tbody>
+            {audioFiles.map((file, index) => (
+              <tr
+                key={file.name}
+                style={{
+                  borderBottom: "1px solid #e5e7eb",
+                  cursor: "pointer",
+                  backgroundColor:
+                    currentSongIndex === index ? "#eff6ff" : "transparent",
+                  // add hover styles via separate hover handlers
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    currentSongIndex === index ? "#eff6ff" : "#f9fafb";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor =
+                    currentSongIndex === index ? "#eff6ff" : "transparent";
+                }}
+                onClick={() => handleSongSelect(file, index)}
+              >
+                <td className="tracklist-table-row-data">{index + 1}</td>
+                <td className="tracklist-table-row-data">{file.name}</td>
+                <td className="tracklist-table-row-data">
+                  {(file.metadata?.size / 1024 / 1024).toFixed(2)} MB
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <a
         href="https://www.flaticon.com/free-icons/google-play-music"
         title="google play music icons"
