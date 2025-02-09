@@ -8,10 +8,10 @@ import {
   VolumeX,
   Repeat,
 } from "lucide-react";
+import supabase from "./config/supabase";
 
 const AudioPlayer = () => {
-  // maintain audio instance across renders
-  const audioRef = useRef(new Audio("/a.mp3"));
+  const audioRef = useRef(new Audio("/a.mp3")); // maintain audio instance across renders
   const [isPlaying, setIsPlaying] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -20,7 +20,58 @@ const AudioPlayer = () => {
   const [showVolume, setShowVolume] = useState(false);
   const [previousVolume, setPreviousVolume] = useState(1);
 
+  // New state for handling files
+  const [audioFiles, setAudioFiles] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch files from Supabase
   useEffect(() => {
+    async function fetchAudioFiles() {
+      try {
+        const { data, error } = await supabase.storage
+          .from("audio")
+          .list("files", {
+            sortBy: { column: "name", order: "asc" },
+          });
+
+        if (error) throw error;
+
+        console.log("Retrieved: {}", data);
+
+        // Filter for audio files if needed
+        const audioFiles = data.filter((file) => file.name.endsWith(".mp3"));
+
+        setAudioFiles(audioFiles);
+
+        // Initialize audio with first file if available
+        if (audioFiles.length > 0) {
+          const { data: fileData } = await supabase.storage
+            .from("audio")
+            .download(`files/${audioFiles[0].name}`);
+
+          audioRef.current = new Audio(URL.createObjectURL(fileData));
+        }
+
+        setIsLoading(false);
+      } catch (err) {
+        setError(err.message);
+        setIsLoading(false);
+      }
+    }
+
+    fetchAudioFiles();
+
+    // Cleanup function
+    return () => {
+      if (audioRef.current) {
+        URL.revokeObjectURL(audioRef.current.src);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!audioRef.current) return;
     const audio = audioRef.current;
 
     // set duration when metadata is loaded
@@ -126,6 +177,19 @@ const AudioPlayer = () => {
     if (volume < 0.5) return <Volume1 />;
     return <Volume2 />;
   };
+
+  // If still loading or there's an error, show appropriate message
+  if (isLoading) {
+    return <div>Loading audio files...</div>;
+  }
+
+  if (error) {
+    return <div>Error loading audio files: {error}</div>;
+  }
+
+  if (audioFiles.length === 0) {
+    return <div>No audio files found</div>;
+  }
 
   return (
     <div>
