@@ -34,15 +34,6 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-.progressBar {
-  border-radius: 0.5rem; 
-  width: 100%; 
-  height: 0.5rem; 
-  background-color: #E5E7EB; 
-  appearance: none; 
-  cursor: pointer; 
-}
-
 .player-card {
   width: 20rem;
   background-color: #f1f4f9;

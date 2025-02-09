@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Pause, Square } from "lucide-react";
+import { Play, Pause, Square, Repeat } from "lucide-react";
 
 const AudioPlayer = () => {
   // maintain audio instance across renders
   const audioRef = useRef(new Audio("/a.mp3"));
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isRepeat, setIsRepeat] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
 
@@ -23,6 +24,18 @@ const AudioPlayer = () => {
     };
     audio.addEventListener("timeupdate", updateProgress);
 
+    // when song ended, repeat song if repeat is enabled
+    const handleAudioEnd = () => {
+      if (isRepeat) {
+        audio.currentTime = 0;
+        audio.play();
+      } else {
+        setIsPlaying(false);
+        audio.currentTime = 0;
+      }
+    };
+    audio.addEventListener("ended", handleAudioEnd);
+
     // if audio already loaded, set duration
     if (audio.readyState >= 2) {
       setDuration(audio.duration);
@@ -35,6 +48,24 @@ const AudioPlayer = () => {
       audio.removeEventListener("timeupdate", updateProgress);
     };
   }, []);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    const handleAudioEnd = () => {
+      if (isRepeat) {
+        audio.currentTime = 0;
+        audio.play();
+      } else {
+        setIsPlaying(false);
+        audio.currentTime = 0;
+      }
+    };
+    audio.addEventListener("ended", handleAudioEnd);
+
+    return () => {
+      audio.removeEventListener("ended", handleAudioEnd);
+    };
+  }, [isRepeat]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -52,6 +83,10 @@ const AudioPlayer = () => {
     audio.currentTime = 0;
     setIsPlaying(false);
     setProgress(0);
+  };
+
+  const toggleRepeat = () => {
+    setIsRepeat(!isRepeat);
   };
 
   const onProgressChange = (e) => {
@@ -75,6 +110,17 @@ const AudioPlayer = () => {
         </button>
         <button onClick={stopAudio}>
           <Square />
+        </button>
+        <button
+          onClick={toggleRepeat}
+          style={{
+            padding: "8px",
+            borderRadius: "50%",
+            color: isRepeat ? "#3b82f6" : "currentColor",
+          }}
+          title={isRepeat ? "Repeat is on" : "Repeat is off"}
+        >
+          <Repeat />
         </button>
       </div>
 
