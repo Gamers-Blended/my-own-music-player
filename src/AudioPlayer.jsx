@@ -33,10 +33,12 @@ const AudioPlayer = () => {
     setProgress(audio.currentTime);
   };
 
-  const handleAudioEnd = (audio) => {
+  const handleAudioEnd = async () => {
     if (isRepeat) {
-      audio.currentTime = 0;
-      audio.play();
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play();
+      }
     } else {
       handleNext();
     }
@@ -160,6 +162,9 @@ const AudioPlayer = () => {
 
     if (nextFile) {
       loadAudioFile(nextFile, nextIndex);
+    } else {
+      // if no next file, stop playback
+      stopAudio();
     }
   };
 
