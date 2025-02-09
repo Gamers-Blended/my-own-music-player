@@ -35,18 +35,6 @@ const AudioPlayer = () => {
     };
     audio.addEventListener("timeupdate", updateProgress);
 
-    // when song ended, repeat song if repeat is enabled
-    const handleAudioEnd = () => {
-      if (isRepeat) {
-        audio.currentTime = 0;
-        audio.play();
-      } else {
-        setIsPlaying(false);
-        audio.currentTime = 0;
-      }
-    };
-    audio.addEventListener("ended", handleAudioEnd);
-
     // if audio already loaded, set duration
     if (audio.readyState >= 2) {
       setDuration(audio.duration);
@@ -60,7 +48,7 @@ const AudioPlayer = () => {
     };
   }, []);
 
-  // for repeat
+  // when song ended, repeat song if repeat is enabled
   useEffect(() => {
     const audio = audioRef.current;
     const handleAudioEnd = () => {
@@ -145,6 +133,7 @@ const AudioPlayer = () => {
         <button onClick={togglePlayPause}>
           {isPlaying ? <Pause /> : <Play />}
         </button>
+
         <button onClick={stopAudio}>
           <Square />
         </button>
