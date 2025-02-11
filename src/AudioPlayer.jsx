@@ -104,7 +104,7 @@ const AudioPlayer = () => {
     }
   };
 
-  const loadAudioFile = async (file, index) => {
+  const loadAudioFile = async (file, index, autoplay = false) => {
     if (!file) {
       setError("Invalid audio file");
       return;
@@ -140,14 +140,17 @@ const AudioPlayer = () => {
 
       // reset player state
       setProgress(0);
-      setIsPlaying(false);
       setError(null); // clear any previous errors
 
       setupAudioEventListeners(audio);
 
-      // auto-play the next song
-      audio.play();
-      setIsPlaying(true);
+      // only play if autoplay is true
+      if (autoplay) {
+        audio.play();
+        setIsPlaying(true);
+      } else {
+        setIsPlaying(false);
+      }
     } catch (err) {
       setError(`Error loading audio file: ${err.message}`);
       console.error("Error loading audio:", err);
@@ -161,7 +164,7 @@ const AudioPlayer = () => {
     const nextFile = audioFiles[nextIndex];
 
     if (nextFile) {
-      loadAudioFile(nextFile, nextIndex);
+      loadAudioFile(nextFile, nextIndex, true);
     } else {
       // if no next file, stop playback
       stopAudio();
@@ -169,7 +172,7 @@ const AudioPlayer = () => {
   };
 
   const handleSongSelect = (file, index) => {
-    loadAudioFile(file, index);
+    loadAudioFile(file, index, true);
   };
 
   useEffect(() => {
