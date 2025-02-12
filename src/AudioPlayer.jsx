@@ -41,7 +41,9 @@ const AudioPlayer = () => {
       paused: audioRef.current?.paused,
     });
 
-    if (isRepeat && audioRef.current) {
+    if (!audioRef.current) return;
+
+    if (isRepeat) {
       console.log("Repeat is enabled - attempting to repeat song...");
       audioRef.current.currentTime = 0;
       setProgress(0);
@@ -53,11 +55,7 @@ const AudioPlayer = () => {
         })
         .catch((err) => console.error("Replay error:", err));
     } else {
-      if (currentSongIndex < audioFiles.length - 1) {
-        handleNext();
-      } else {
-        stopAudio();
-      }
+      stopAudio();
     }
   }, [isRepeat, currentSongIndex, audioFiles.length]);
 
@@ -131,7 +129,7 @@ const AudioPlayer = () => {
     }
   };
 
-  const loadAudioFile = async (file, index, autoplay = false) => {
+  const loadAudioFile = async (file, index) => {
     if (!file) {
       setError("Invalid audio file");
       return;
@@ -171,13 +169,24 @@ const AudioPlayer = () => {
 
       setupAudioEventListeners(audio);
 
-      // only play if autoplay is true
-      if (autoplay) {
-        audio.play();
-        setIsPlaying(true);
-      } else {
-        setIsPlaying(false);
-      }
+      // // only play if autoplay is true
+      // if (autoplay) {
+      //   audio.play();
+      //   setIsPlaying(true);
+      // } else {
+      //   setIsPlaying(false);
+      // }
+
+      // Always start playing the loaded audio
+      audio
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+        })
+        .catch((err) => {
+          console.error("Error playing audio:", err);
+          setError(`Error playing audio: ${err.message}`);
+        });
     } catch (err) {
       setError(`Error loading audio file: ${err.message}`);
       console.error("Error loading audio:", err);
@@ -191,7 +200,8 @@ const AudioPlayer = () => {
     const nextFile = audioFiles[nextIndex];
 
     if (nextFile) {
-      loadAudioFile(nextFile, nextIndex, true);
+      // Remove autoplay parameter since we'll handle playback in loadAudioFile
+      loadAudioFile(nextFile, nextIndex);
     } else {
       // if no next file, stop playback
       stopAudio();
