@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Play,
   Pause,
@@ -33,27 +33,54 @@ const AudioPlayer = () => {
     setProgress(audio.currentTime);
   };
 
-  const handleAudioEnd = async () => {
-    if (isRepeat) {
-      if (audioRef.current) {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play();
-      }
+  const handleAudioEnd = useCallback(() => {
+    console.log("Audio ended. isRepeat:", isRepeat);
+    console.log("Current audio state:", {
+      currentTime: audioRef.current?.currentTime,
+      duration: audioRef.current?.duration,
+      paused: audioRef.current?.paused,
+    });
+
+    if (isRepeat && audioRef.current) {
+      console.log("Repeat is enabled - attempting to repeat song...");
+      audioRef.current.currentTime = 0;
+      setProgress(0);
+      audioRef.current
+        .play()
+        .then(() => {
+          setIsPlaying(true);
+          console.log("Replay started");
+        })
+        .catch((err) => console.error("Replay error:", err));
     } else {
-      handleNext();
+      if (currentSongIndex < audioFiles.length - 1) {
+        handleNext();
+      } else {
+        stopAudio();
+      }
     }
-  };
+  }, [isRepeat, currentSongIndex, audioFiles.length]);
 
   const setupAudioEventListeners = (audio) => {
-    audio.removeEventListener("timeupdate", () => updateProgress(audio));
-    audio.removeEventListener("ended", () => handleAudioEnd(audio));
+    console.log("Setting up audio event listeners");
+
+    audio.removeEventListener("timeupdate", updateProgress);
+    audio.removeEventListener("ended", handleAudioEnd);
 
     audio.addEventListener("timeupdate", () => updateProgress(audio));
-    audio.addEventListener("ended", () => handleAudioEnd(audio));
+    audio.addEventListener("ended", handleAudioEnd);
 
-    // set initial volume
     audio.volume = volume;
+
+    console.log("Audio event listeners set up complete");
   };
+
+  // call setupAudioEventListeners whenever handleAudioEnd changes
+  useEffect(() => {
+    if (audioRef.current) {
+      setupAudioEventListeners(audioRef.current);
+    }
+  }, [handleAudioEnd]);
 
   // fetch files from Supabase
   useEffect(() => {
@@ -265,6 +292,7 @@ const AudioPlayer = () => {
 
   return (
     <div>
+      <div>version: 1.0.1</div>
       <div className="player-card">
         <button onClick={togglePlayPause}>
           {isPlaying ? <Pause /> : <Play />}
@@ -340,7 +368,6 @@ const AudioPlayer = () => {
             <tr className="tracklist-table-header">
               <th className="tracklist-table-row">#</th>
               <th className="tracklist-table-row">File Name</th>
-              <th className="tracklist-table-row">Size</th>
             </tr>
           </thead>
           <tbody>
@@ -366,9 +393,6 @@ const AudioPlayer = () => {
               >
                 <td className="tracklist-table-row-data">{index + 1}</td>
                 <td className="tracklist-table-row-data">{file.name}</td>
-                <td className="tracklist-table-row-data">
-                  {(file.metadata?.size / 1024 / 1024).toFixed(2)} MB
-                </td>
               </tr>
             ))}
           </tbody>
